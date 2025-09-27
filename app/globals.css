@@ -1,0 +1,331 @@
+@import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
+
+:root {
+  /* Orange, White, Green Color Scheme */
+  --background: oklch(1 0 0); /* White */
+  --foreground: oklch(0.2 0.02 0); /* Dark gray/black */
+  --card: oklch(1 0 0); /* White */
+  --card-foreground: oklch(0.2 0.02 0); /* Dark gray/black */
+  --popover: oklch(1 0 0); /* White */
+  --popover-foreground: oklch(0.2 0.02 0); /* Dark gray/black */
+  --primary: oklch(0.6 0.15 40); /* Orange */
+  --primary-foreground: oklch(1 0 0); /* White */
+  --secondary: oklch(0.95 0.01 0); /* Light gray */
+  --secondary-foreground: oklch(0.2 0.02 0); /* Dark gray/black */
+  --muted: oklch(0.95 0.01 0); /* Light gray */
+  --muted-foreground: oklch(0.5 0.02 0); /* Medium gray */
+  --accent: oklch(0.65 0.15 140); /* Green */
+  --accent-foreground: oklch(1 0 0); /* White */
+  --destructive: oklch(0.6 0.2 20); /* Red-orange */
+  --destructive-foreground: oklch(1 0 0); /* White */
+  --border: oklch(0.9 0.01 0); /* Light gray border */
+  --input: oklch(0.95 0.01 0); /* Light gray input */
+  --ring: oklch(0.6 0.15 40); /* Orange ring */
+  --chart-1: oklch(0.6 0.15 40); /* Orange */
+  --chart-2: oklch(0.65 0.15 140); /* Green */
+  --chart-3: oklch(0.7 0.1 60); /* Yellow-orange */
+  --chart-4: oklch(0.55 0.15 40); /* Darker orange */
+  --chart-5: oklch(0.6 0.15 140); /* Green variant */
+  --radius: 0.75rem;
+  --sidebar: oklch(0.98 0.01 0); /* Very light gray */
+  --sidebar-foreground: oklch(0.2 0.02 0); /* Dark gray/black */
+  --sidebar-primary: oklch(0.6 0.15 40); /* Orange */
+  --sidebar-primary-foreground: oklch(1 0 0); /* White */
+  --sidebar-accent: oklch(0.95 0.01 0); /* Light gray */
+  --sidebar-accent-foreground: oklch(0.2 0.02 0); /* Dark gray/black */
+  --sidebar-border: oklch(0.9 0.01 0); /* Light gray border */
+  --sidebar-ring: oklch(0.6 0.15 40); /* Orange ring */
+
+  /* Business-specific colors using the three-color scheme */
+  --onboarding-primary: oklch(0.6 0.15 40); /* Orange */
+  --onboarding-primary-foreground: oklch(1 0 0); /* White */
+  --onboarding-secondary: oklch(0.95 0.01 0); /* Light gray */
+  --onboarding-accent: oklch(0.65 0.15 140); /* Green */
+  
+  /* WhatsApp color */
+  --whatsapp: 142 70% 49%;
+  --whatsapp-foreground: 0 0% 100%;
+}
+
+.dark {
+  /* Orange, White, Green Color Scheme - Dark Mode */
+  --background: oklch(0.08 0.01 0); /* Very dark gray */
+  --foreground: oklch(0.95 0.01 0); /* White */
+  --card: oklch(0.1 0.01 0); /* Dark gray */
+  --card-foreground: oklch(0.95 0.01 0); /* White */
+  --popover: oklch(0.1 0.01 0); /* Dark gray */
+  --popover-foreground: oklch(0.95 0.01 0); /* White */
+  --primary: oklch(0.7 0.15 40); /* Bright orange */
+  --primary-foreground: oklch(0.08 0.01 0); /* Dark background */
+  --secondary: oklch(0.15 0.01 0); /* Medium dark gray */
+  --secondary-foreground: oklch(0.95 0.01 0); /* White */
+  --muted: oklch(0.15 0.01 0); /* Medium dark gray */
+  --muted-foreground: oklch(0.6 0.01 0); /* Light gray */
+  --accent: oklch(0.7 0.15 140); /* Bright green */
+  --accent-foreground: oklch(0.08 0.01 0); /* Dark background */
+  --destructive: oklch(0.7 0.2 20); /* Bright red-orange */
+  --destructive-foreground: oklch(0.95 0.01 0); /* White */
+  --border: oklch(0.2 0.01 0); /* Dark gray border */
+  --input: oklch(0.15 0.01 0); /* Medium dark gray input */
+  --ring: oklch(0.7 0.15 40); /* Bright orange ring */
+  --chart-1: oklch(0.7 0.15 40); /* Bright orange */
+  --chart-2: oklch(0.7 0.15 140); /* Bright green */
+  --chart-3: oklch(0.8 0.1 60); /* Bright yellow-orange */
+  --chart-4: oklch(0.65 0.15 40); /* Orange */
+  --chart-5: oklch(0.7 0.15 140); /* Green variant */
+  --radius: 0.75rem;
+  --sidebar: oklch(0.08 0.01 0); /* Very dark gray */
+  --sidebar-foreground: oklch(0.95 0.01 0); /* White */
+  --sidebar-primary: oklch(0.7 0.15 40); /* Bright orange */
+  --sidebar-primary-foreground: oklch(0.08 0.01 0); /* Dark background */
+  --sidebar-accent: oklch(0.15 0.01 0); /* Medium dark gray */
+  --sidebar-accent-foreground: oklch(0.95 0.01 0); /* White */
+  --sidebar-border: oklch(0.2 0.01 0); /* Dark gray border */
+  --sidebar-ring: oklch(0.7 0.15 40); /* Bright orange ring */
+
+  /* Business-specific colors using the three-color scheme - Dark Mode */
+  --success: oklch(0.7 0.15 140); /* Bright green */
+  --success-foreground: oklch(0.08 0.01 0); /* Dark background */
+  --warning: oklch(0.8 0.15 60); /* Bright yellow-orange */
+  --warning-foreground: oklch(0.08 0.01 0); /* Dark background */
+
+  /* Sales-specific colors */
+  --sales-accent: oklch(0.7 0.15 140); /* Bright green */
+  --sales-accent-foreground: oklch(0.08 0.01 0); /* Dark background */
+
+  /* Inventory-specific colors */
+  --inventory-low-stock: oklch(0.7 0.2 20); /* Bright red-orange */
+  --inventory-low-stock-foreground: oklch(0.95 0.01 0); /* White */
+  --inventory-in-stock: oklch(0.7 0.15 140); /* Bright green */
+  --inventory-in-stock-foreground: oklch(0.08 0.01 0); /* Dark background */
+
+  /* Customer debt tracking colors */
+  --customer-debt: oklch(0.7 0.2 20); /* Bright red-orange */
+  --customer-debt-foreground: oklch(0.95 0.01 0); /* White */
+  --customer-paid: oklch(0.7 0.15 140); /* Bright green */
+  --customer-paid-foreground: oklch(0.08 0.01 0); /* Dark background */
+  
+  /* WhatsApp color - Dark Mode */
+  --whatsapp: 142 70% 49%;
+  --whatsapp-foreground: 0 0% 100%;
+}
+
+@theme inline {
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Added onboarding color tokens */
+  --color-onboarding-primary: var(--onboarding-primary);
+  --color-onboarding-primary-foreground: var(--onboarding-primary-foreground);
+  --color-onboarding-secondary: var(--onboarding-secondary);
+  --color-onboarding-accent: var(--onboarding-accent);
+
+  /* Added success and warning color tokens for dashboard */
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+
+  /* Added sales color tokens */
+  --color-sales-accent: var(--sales-accent);
+  --color-sales-accent-foreground: var(--sales-accent-foreground);
+
+  /* Added inventory color tokens */
+  --color-inventory-low-stock: var(--inventory-low-stock);
+  --color-inventory-low-stock-foreground: var(--inventory-low-stock-foreground);
+  --color-inventory-in-stock: var(--inventory-in-stock);
+  --color-inventory-in-stock-foreground: var(--inventory-in-stock-foreground);
+
+  /* Added customer debt tracking color tokens */
+  --color-customer-debt: var(--customer-debt);
+  --color-customer-debt-foreground: var(--customer-debt-foreground);
+  --color-customer-paid: var(--customer-paid);
+  --color-customer-paid-foreground: var(--customer-paid-foreground);
+  --color-whatsapp: var(--whatsapp);
+  --color-whatsapp-foreground: var(--whatsapp-foreground);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+  
+  /* Mobile-first PWA optimizations */
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Safe area support for mobile devices */
+  .safe-area-pb {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  
+  /* Prevent zoom on input focus on iOS */
+  input[type="text"],
+  input[type="email"],
+  input[type="password"],
+  input[type="number"],
+  textarea,
+  select {
+    font-size: 16px;
+  }
+  
+  /* Smooth scrolling */
+  html {
+    scroll-behavior: smooth;
+  }
+  
+  /* Custom scrollbar for webkit browsers */
+  ::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  
+  ::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 3px;
+  }
+  
+  ::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground) / 0.5);
+  }
+  
+  /* PWA specific styles */
+  @media (display-mode: standalone) {
+    body {
+      -webkit-user-select: none;
+      -webkit-touch-callout: none;
+    }
+  }
+  
+  /* Focus styles for accessibility */
+  .focus-visible:focus-visible {
+    @apply outline-2 outline-offset-2 outline-ring;
+  }
+  
+  /* Prevent global hover effects from propagating */
+  * {
+    pointer-events: auto;
+  }
+  
+  /* Ensure hover effects are only applied to intended elements */
+  .hover-isolated {
+    pointer-events: auto;
+  }
+  
+  .hover-isolated * {
+    pointer-events: none;
+  }
+  
+  .hover-isolated:hover * {
+    pointer-events: auto;
+  }
+  
+  /* Animation for FAB */
+  @keyframes fab-pulse {
+    0% {
+      transform: scale(1);
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+    }
+  }
+  
+  .fab-pulse {
+    animation: fab-pulse 2s infinite;
+  }
+
+  /* Custom animation keyframes */
+  @keyframes fadeInDown {
+    0% {
+      opacity: 0;
+      transform: translateY(-20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInUp {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes fadeInLeft {
+    0% {
+      opacity: 0;
+      transform: translateX(-20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateX(0);
+    }
+  }
+
+  @keyframes fadeInScale {
+    0% {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    100% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+}
