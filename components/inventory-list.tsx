@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Search, Filter, Package, Plus, AlertTriangle, CheckCircle, XCircle } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -152,6 +152,17 @@ export function InventoryList() {
   const [showLowStockOnly, setShowLowStockOnly] = useState(false)
   const [isAddProductOpen, setIsAddProductOpen] = useState(false)
   const [editingProduct, setEditingProduct] = useState<Product | null>(null)
+
+  // Listen for custom event from FAB
+  useEffect(() => {
+    const handleOpenAddProduct = () => {
+      setEditingProduct(null)
+      setIsAddProductOpen(true)
+    }
+
+    window.addEventListener('openAddProduct', handleOpenAddProduct)
+    return () => window.removeEventListener('openAddProduct', handleOpenAddProduct)
+  }, [])
 
   const filteredProducts = mockProducts.filter((product) => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -342,17 +353,8 @@ export function InventoryList() {
         )}
       </div>
 
-      {/* FAB for New Product */}
-      <Button
-        size="lg"
-        className="fixed bottom-20 left-1/2 transform -translate-x-1/2 z-50 h-14 w-14 rounded-full shadow-xl bg-primary hover:bg-primary/90 text-primary-foreground border-2 border-background"
-        onClick={() => {
-          setEditingProduct(null)
-          setIsAddProductOpen(true)
-        }}
-      >
-        <Plus className="h-6 w-6" />
-      </Button>
+      {/* FAB for New Product - Hidden, handled by PWALayout */}
+      <div id="inventory-fab-trigger" className="hidden" />
 
       {/* Product Modal */}
       <ProductModal

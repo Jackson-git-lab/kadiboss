@@ -1,15 +1,20 @@
 "use client"
 
 import { useState, useEffect, useMemo, useCallback } from "react"
-import { Search, Plus, Phone, MessageCircle, AlertTriangle, CheckCircle, User, Mail, Calendar, DollarSign, Loader2, X, ChevronDown, ChevronUp } from "lucide-react"
+import { Search, Plus, Phone, MessageCircle, AlertTriangle, CheckCircle, User, Mail, Calendar, DollarSign, Loader2, X, ChevronDown, ChevronUp, Download, Upload, Edit, Trash2, MoreVertical, Filter, ChevronLeft, ChevronRight, CheckSquare, Square } from "lucide-react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
+import { AnimatedButton } from "@/components/ui/animated-button"
+import { AnimatedCard, AnimatedCardContent } from "@/components/ui/animated-card"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { PaymentSlideOver } from "@/components/payment-slide-over"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu"
+import { Checkbox } from "@/components/ui/checkbox"
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog"
 import { toast } from "sonner"
 
 interface Customer {
@@ -134,13 +139,29 @@ export function CustomerList() {
   const [searchTerm, setSearchTerm] = useState("")
   const [showDebtorsOnly, setShowDebtorsOnly] = useState(false)
   const [isAddCustomerOpen, setIsAddCustomerOpen] = useState(false)
+  const [isEditCustomerOpen, setIsEditCustomerOpen] = useState(false)
   const [isPaymentOpen, setIsPaymentOpen] = useState(false)
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [sortBy, setSortBy] = useState<"name" | "debt" | "lastPayment">("name")
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc")
   const [expandedCustomer, setExpandedCustomer] = useState<string | null>(null)
+  const [selectedCustomers, setSelectedCustomers] = useState<Set<string>>(new Set())
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage, setItemsPerPage] = useState(10)
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "inactive" | "blocked">("all")
+  const [debtRangeFilter, setDebtRangeFilter] = useState<"all" | "no-debt" | "low-debt" | "high-debt">("all")
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false)
+  const [customerToDelete, setCustomerToDelete] = useState<Customer | null>(null)
   const [newCustomer, setNewCustomer] = useState({
+    name: "",
+    phone: "",
+    email: "",
+    creditLimit: "",
+  })
+  const [editCustomer, setEditCustomer] = useState({
+    id: "",
     name: "",
     phone: "",
     email: "",
@@ -153,8 +174,21 @@ export function CustomerList() {
       const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            customer.phone.includes(searchTerm) ||
                            (customer.email && customer.email.toLowerCase().includes(searchTerm.toLowerCase()))
-      const matchesFilter = showDebtorsOnly ? customer.amountOwed > 0 : true
-      return matchesSearch && matchesFilter
+      
+      const matchesDebtorFilter = showDebtorsOnly ? customer.amountOwed > 0 : true
+      
+      const matchesStatusFilter = statusFilter === "all" || customer.status === statusFilter
+      
+      const matchesDebtRangeFilter = (() => {
+        switch (debtRangeFilter) {
+          case "no-debt": return customer.amountOwed === 0
+          case "low-debt": return customer.amountOwed > 0 && customer.amountOwed <= 10000
+          case "high-debt": return customer.amountOwed > 10000
+          default: return true
+        }
+      })()
+      
+      return matchesSearch && matchesDebtorFilter && matchesStatusFilter && matchesDebtRangeFilter
     })
 
     // Sort customers
@@ -177,7 +211,104 @@ export function CustomerList() {
     })
 
     return filtered
-  }, [searchTerm, showDebtorsOnly, sortBy, sortOrder])
+  }, [searchTerm, showDebtorsOnly, sortBy, sortOrder, statusFilter, debtRangeFilter])
+
+  // Pagination logic
+  const totalPages = Math.ceil(filteredCustomers.length / itemsPerPage)
+  const startIndex = (currentPage - 1) * itemsPerPage
+  const endIndex = startIndex + itemsPerPage
+  const paginatedCustomers = filteredCustomers.slice(startIndex, endIndex)
+
+  // Reset to first page when filters change
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [searchTerm, showDebtorsOnly, statusFilter, debtRangeFilter])
+
+  // Load customers from localStorage on mount
+  useEffect(() => {
+    const savedCustomers = localStorage.getItem('kadiboss-customers')
+    if (savedCustomers) {
+      try {
+        const parsedCustomers = JSON.parse(savedCustomers).map((customer: any) => ({
+          ...customer,
+          lastPayment: customer.lastPayment ? new Date(customer.lastPayment) : undefined,
+          lastContact: customer.lastContact ? new Date(customer.lastContact) : undefined,
+        }))
+        setCustomers(parsedCustomers)
+      } catch (error) {
+        console.error('Error loading customers from localStorage:', error)
+      }
+    }
+  }, [])
+
+  // Save customers to localStorage whenever customers change
+  useEffect(() => {
+    localStorage.setItem('kadiboss-customers', JSON.stringify(customers))
+  }, [customers])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl/Cmd + N: Add new customer
+      if ((e.ctrlKey || e.metaKey) && e.key === 'n') {
+        e.preventDefault()
+        setIsAddCustomerOpen(true)
+      }
+      
+      // Ctrl/Cmd + E: Export data
+      if ((e.ctrlKey || e.metaKey) && e.key === 'e') {
+        e.preventDefault()
+        // Call exportToCSV directly without dependency
+        const selectedCustomersData = selectedCustomers.size > 0 
+          ? customers.filter(c => selectedCustomers.has(c.id))
+          : filteredCustomers
+
+        const csvContent = [
+          ["Nom", "Téléphone", "Email", "Dette", "Statut", "Total Achats", "Limite Crédit", "Dernier Paiement"],
+          ...selectedCustomersData.map(customer => [
+            customer.name,
+            customer.phone,
+            customer.email || "",
+            customer.amountOwed.toString(),
+            customer.status,
+            customer.totalPurchases.toString(),
+            customer.creditLimit.toString(),
+            customer.lastPayment ? customer.lastPayment.toLocaleDateString('fr-FR') : "Jamais"
+          ])
+        ].map(row => row.join(",")).join("\n")
+
+        const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+        const link = document.createElement("a")
+        const url = URL.createObjectURL(blob)
+        link.setAttribute("href", url)
+        link.setAttribute("download", `clients_${new Date().toISOString().split('T')[0]}.csv`)
+        link.style.visibility = "hidden"
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        
+        toast.success("Export CSV réussi")
+      }
+      
+      // Ctrl/Cmd + F: Focus search
+      if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+        e.preventDefault()
+        const searchInput = document.querySelector('input[placeholder="Rechercher un client..."]') as HTMLInputElement
+        searchInput?.focus()
+      }
+      
+      // Escape: Close modals
+      if (e.key === 'Escape') {
+        setIsAddCustomerOpen(false)
+        setIsEditCustomerOpen(false)
+        setIsDeleteDialogOpen(false)
+        setShowAdvancedFilters(false)
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [customers, filteredCustomers, selectedCustomers])
 
   const formatAmount = (amount: number) => {
     return `${amount.toLocaleString()} F`
@@ -296,6 +427,137 @@ export function CustomerList() {
     setExpandedCustomer(prev => prev === customerId ? null : customerId)
   }, [])
 
+  // Customer management functions
+  const handleEditCustomer = useCallback((customer: Customer) => {
+    setEditCustomer({
+      id: customer.id,
+      name: customer.name,
+      phone: customer.phone,
+      email: customer.email || "",
+      creditLimit: customer.creditLimit.toString(),
+    })
+    setIsEditCustomerOpen(true)
+  }, [])
+
+  const handleUpdateCustomer = useCallback(async () => {
+    if (editCustomer.name && editCustomer.phone) {
+      setIsLoading(true)
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        setCustomers(prev => prev.map(customer => 
+          customer.id === editCustomer.id 
+            ? {
+                ...customer,
+                name: editCustomer.name,
+                phone: editCustomer.phone,
+                email: editCustomer.email || undefined,
+                creditLimit: Number.parseInt(editCustomer.creditLimit) || 0,
+              }
+            : customer
+        ))
+        
+        toast.success("Client mis à jour avec succès")
+        setIsEditCustomerOpen(false)
+        setEditCustomer({ id: "", name: "", phone: "", email: "", creditLimit: "" })
+      } catch (error) {
+        toast.error("Erreur lors de la mise à jour du client")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }, [editCustomer])
+
+  const handleDeleteCustomer = useCallback((customer: Customer) => {
+    setCustomerToDelete(customer)
+    setIsDeleteDialogOpen(true)
+  }, [])
+
+  const confirmDeleteCustomer = useCallback(async () => {
+    if (customerToDelete) {
+      setIsLoading(true)
+      try {
+        await new Promise(resolve => setTimeout(resolve, 1000))
+        
+        setCustomers(prev => prev.filter(customer => customer.id !== customerToDelete.id))
+        toast.success(`${customerToDelete.name} supprimé avec succès`)
+        setIsDeleteDialogOpen(false)
+        setCustomerToDelete(null)
+      } catch (error) {
+        toast.error("Erreur lors de la suppression du client")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+  }, [customerToDelete])
+
+  // Selection management
+  const toggleCustomerSelection = useCallback((customerId: string) => {
+    setSelectedCustomers(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(customerId)) {
+        newSet.delete(customerId)
+      } else {
+        newSet.add(customerId)
+      }
+      return newSet
+    })
+  }, [])
+
+  const selectAllCustomers = useCallback(() => {
+    setSelectedCustomers(new Set(paginatedCustomers.map(c => c.id)))
+  }, [paginatedCustomers])
+
+  const clearSelection = useCallback(() => {
+    setSelectedCustomers(new Set())
+  }, [])
+
+  // Export functions
+  const exportToCSV = useCallback(() => {
+    const selectedCustomersData = selectedCustomers.size > 0 
+      ? customers.filter(c => selectedCustomers.has(c.id))
+      : filteredCustomers
+
+    const csvContent = [
+      ["Nom", "Téléphone", "Email", "Dette", "Statut", "Total Achats", "Limite Crédit", "Dernier Paiement"],
+      ...selectedCustomersData.map(customer => [
+        customer.name,
+        customer.phone,
+        customer.email || "",
+        customer.amountOwed.toString(),
+        customer.status,
+        customer.totalPurchases.toString(),
+        customer.creditLimit.toString(),
+        customer.lastPayment ? customer.lastPayment.toLocaleDateString('fr-FR') : "Jamais"
+      ])
+    ].map(row => row.join(",")).join("\n")
+
+    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+    const link = document.createElement("a")
+    const url = URL.createObjectURL(blob)
+    link.setAttribute("href", url)
+    link.setAttribute("download", `clients_${new Date().toISOString().split('T')[0]}.csv`)
+    link.style.visibility = "hidden"
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    
+    toast.success("Export CSV réussi")
+  }, [customers, filteredCustomers, selectedCustomers])
+
+  // Pagination functions
+  const goToPage = useCallback((page: number) => {
+    setCurrentPage(Math.max(1, Math.min(page, totalPages)))
+  }, [totalPages])
+
+  const nextPage = useCallback(() => {
+    setCurrentPage(prev => Math.min(prev + 1, totalPages))
+  }, [totalPages])
+
+  const prevPage = useCallback(() => {
+    setCurrentPage(prev => Math.max(prev - 1, 1))
+  }, [])
+
   const getDebtStatus = (amount: number) => {
     if (amount === 0) return { status: "À jour", color: "default", icon: CheckCircle }
     if (amount <= 10000) return { status: "Dette faible", color: "secondary", icon: AlertTriangle }
@@ -353,7 +615,8 @@ export function CustomerList() {
         <div 
           className="space-y-3 opacity-0 animate-[fadeInUp_0.5s_ease-out_0.2s_forwards]"
         >
-          <div className="relative">
+          <div className="flex flex-col lg:flex-row gap-3">
+            <div className="relative flex-1">
             <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
             <Input
               placeholder="Rechercher un client..."
@@ -372,9 +635,115 @@ export function CustomerList() {
               </button>
             )}
           </div>
+            
+            {/* Action Buttons */}
+            <div className="flex gap-1 sm:gap-2 flex-wrap">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                className="h-10 sm:h-12 px-2 sm:px-4 transition-all duration-200 hover:scale-[1.05] flex-1 sm:flex-none min-w-0"
+              >
+                <Filter className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Filtres</span>
+              </Button>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={exportToCSV}
+                className="h-10 sm:h-12 px-2 sm:px-4 transition-all duration-200 hover:scale-[1.05] flex-1 sm:flex-none min-w-0"
+              >
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Export</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Advanced Filters */}
+          {showAdvancedFilters && (
+            <div className="p-4 bg-muted/50 rounded-lg border border-border space-y-4 opacity-0 animate-[fadeInDown_0.3s_ease-out_forwards]">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Statut</Label>
+                  <Select value={statusFilter} onValueChange={(value: any) => setStatusFilter(value)}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les statuts</SelectItem>
+                      <SelectItem value="active">Actif</SelectItem>
+                      <SelectItem value="inactive">Inactif</SelectItem>
+                      <SelectItem value="blocked">Bloqué</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Niveau de dette</Label>
+                  <Select value={debtRangeFilter} onValueChange={(value: any) => setDebtRangeFilter(value)}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les niveaux</SelectItem>
+                      <SelectItem value="no-debt">Sans dette</SelectItem>
+                      <SelectItem value="low-debt">Dette faible (≤10k)</SelectItem>
+                      <SelectItem value="high-debt">Dette élevée (&gt;10k)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label className="text-sm font-medium mb-2 block">Éléments par page</Label>
+                  <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(Number(value))}>
+                    <SelectTrigger className="h-10">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="50">50</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="flex flex-wrap items-center gap-1 sm:gap-2 w-full sm:w-auto">
+              {/* Selection Controls */}
+              {paginatedCustomers.length > 0 && (
+                <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={selectedCustomers.size === paginatedCustomers.length ? clearSelection : selectAllCustomers}
+                    className="h-8 sm:h-10 px-2 sm:px-3 transition-all duration-200 hover:scale-[1.05] text-xs sm:text-sm min-w-0"
+                  >
+                    {selectedCustomers.size === paginatedCustomers.length ? (
+                      <CheckSquare className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                    ) : (
+                      <Square className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
+                    )}
+                    <span className="hidden sm:inline">
+                      {selectedCustomers.size === paginatedCustomers.length ? "Tout désélectionner" : "Tout sélectionner"}
+                    </span>
+                    <span className="sm:hidden">
+                      {selectedCustomers.size === paginatedCustomers.length ? "Désélect." : "Sélect."}
+                    </span>
+                  </Button>
+                  
+                  {selectedCustomers.size > 0 && (
+                    <Badge variant="secondary" className="text-xs">
+                      {selectedCustomers.size} sélectionné{selectedCustomers.size > 1 ? 's' : ''}
+                    </Badge>
+                  )}
+                </div>
+              )}
+
               <Button
                 variant={showDebtorsOnly ? "default" : "outline"}
                 size="sm"
@@ -396,56 +765,69 @@ export function CustomerList() {
               </Button>
 
               {/* Sort Controls */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1 flex-wrap">
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleSort("name")}
-                  className={`h-10 px-2 transition-all duration-200 hover:scale-[1.05] ${
+                  className={`h-8 sm:h-10 px-1 sm:px-2 transition-all duration-200 hover:scale-[1.05] text-xs min-w-0 ${
                     sortBy === "name" ? "bg-primary text-primary-foreground" : ""
                   }`}
                   aria-label={`Trier par nom ${sortBy === "name" ? (sortOrder === "asc" ? "croissant" : "décroissant") : ""}`}
                 >
                   <span className="text-xs">Nom</span>
                   {sortBy === "name" && (
-                    sortOrder === "asc" ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />
+                    sortOrder === "asc" ? <ChevronUp className="h-2 w-2 sm:h-3 sm:w-3 ml-1" /> : <ChevronDown className="h-2 w-2 sm:h-3 sm:w-3 ml-1" />
                   )}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleSort("debt")}
-                  className={`h-10 px-2 transition-all duration-200 hover:scale-[1.05] ${
+                  className={`h-8 sm:h-10 px-1 sm:px-2 transition-all duration-200 hover:scale-[1.05] text-xs min-w-0 ${
                     sortBy === "debt" ? "bg-primary text-primary-foreground" : ""
                   }`}
                   aria-label={`Trier par dette ${sortBy === "debt" ? (sortOrder === "asc" ? "croissante" : "décroissante") : ""}`}
                 >
                   <span className="text-xs">Dette</span>
                   {sortBy === "debt" && (
-                    sortOrder === "asc" ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />
+                    sortOrder === "asc" ? <ChevronUp className="h-2 w-2 sm:h-3 sm:w-3 ml-1" /> : <ChevronDown className="h-2 w-2 sm:h-3 sm:w-3 ml-1" />
                   )}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
                   onClick={() => handleSort("lastPayment")}
-                  className={`h-10 px-2 transition-all duration-200 hover:scale-[1.05] ${
+                  className={`h-8 sm:h-10 px-1 sm:px-2 transition-all duration-200 hover:scale-[1.05] text-xs min-w-0 ${
                     sortBy === "lastPayment" ? "bg-primary text-primary-foreground" : ""
                   }`}
                   aria-label={`Trier par dernier paiement ${sortBy === "lastPayment" ? (sortOrder === "asc" ? "croissant" : "décroissant") : ""}`}
                 >
                   <span className="text-xs">Paiement</span>
                   {sortBy === "lastPayment" && (
-                    sortOrder === "asc" ? <ChevronUp className="h-3 w-3 ml-1" /> : <ChevronDown className="h-3 w-3 ml-1" />
+                    sortOrder === "asc" ? <ChevronUp className="h-2 w-2 sm:h-3 sm:w-3 ml-1" /> : <ChevronDown className="h-2 w-2 sm:h-3 sm:w-3 ml-1" />
                   )}
                 </Button>
               </div>
             </div>
             
+            <div className="flex items-center gap-3">
             <div className="animate-in zoom-in duration-300 delay-400">
               <Badge variant="secondary" className="text-sm">
                 {filteredCustomers.length} client{filteredCustomers.length !== 1 ? 's' : ''}
               </Badge>
+              </div>
+              
+              {/* Keyboard Shortcuts Info */}
+              <div className="hidden lg:flex items-center gap-2 text-xs text-muted-foreground">
+                <span>Raccourcis:</span>
+                <kbd className="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl+N</kbd>
+                <span>Nouveau</span>
+                <kbd className="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl+E</kbd>
+                <span>Export</span>
+                <kbd className="px-1.5 py-0.5 text-xs bg-muted border rounded">Ctrl+F</kbd>
+                <span>Recherche</span>
+              </div>
             </div>
           </div>
         </div>
@@ -453,10 +835,11 @@ export function CustomerList() {
 
       {/* Customer List */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3">
-        {filteredCustomers.map((customer, index) => {
+        {paginatedCustomers.map((customer, index) => {
           const debtStatus = getDebtStatus(customer.amountOwed)
           const StatusIcon = debtStatus.icon
           const isExpanded = expandedCustomer === customer.id
+          const isSelected = selectedCustomers.has(customer.id)
 
           return (
             <div
@@ -467,7 +850,9 @@ export function CustomerList() {
               <Card 
                 className={`bg-card border-border hover:bg-accent/50 transition-all duration-300 hover:shadow-lg cursor-pointer hover:scale-[1.02] hover:-translate-y-0.5 hover-isolated ${
                   customer.amountOwed > 0 ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/20" : ""
-                } ${isExpanded ? "ring-2 ring-blue-200 dark:ring-blue-800" : ""}`}
+                } ${isExpanded ? "ring-2 ring-blue-200 dark:ring-blue-800" : ""} ${
+                  isSelected ? "ring-2 ring-primary bg-primary/5" : ""
+                }`}
                 onClick={() => toggleCustomerExpansion(customer.id)}
                 role="button"
                 tabIndex={0}
@@ -480,44 +865,55 @@ export function CustomerList() {
                   }
                 }}
               >
-                <CardContent className="p-4">
-                  <div className="flex items-center gap-4">
+                <CardContent className="p-3 sm:p-4">
+                  <div className="flex items-start gap-2 sm:gap-4">
+                    {/* Selection Checkbox */}
+                    <div className="flex items-center flex-shrink-0">
+                      <Checkbox
+                        checked={isSelected}
+                        onCheckedChange={() => toggleCustomerSelection(customer.id)}
+                        onClick={(e) => e.stopPropagation()}
+                        className="h-4 w-4 sm:h-5 sm:w-5"
+                        aria-label={`Sélectionner ${customer.name}`}
+                      />
+                    </div>
+
                     {/* Customer Avatar */}
                     <div 
-                      className="w-16 h-16 rounded-xl bg-muted/20 flex items-center justify-center transition-all duration-200"
+                      className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl bg-muted/20 flex items-center justify-center transition-all duration-200 flex-shrink-0"
                     >
-                      <User className="h-8 w-8 text-muted-foreground" />
+                      <User className="h-6 w-6 sm:h-8 sm:w-8 text-muted-foreground" />
                     </div>
 
                     {/* Customer Info */}
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3">
+                      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2 sm:gap-3">
                         <div className="flex-1 min-w-0">
-                          <h3 className="font-semibold text-foreground text-base leading-tight mb-1">
+                          <h3 className="font-semibold text-foreground text-sm sm:text-base leading-tight mb-1 truncate">
                             {customer.name}
                           </h3>
-                          <div className="flex items-center gap-2 mb-2">
-                            <Phone className="h-4 w-4 text-muted-foreground" />
-                            <span className="text-sm text-muted-foreground">{customer.phone}</span>
+                          <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                            <Phone className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                            <span className="text-xs sm:text-sm text-muted-foreground truncate">{customer.phone}</span>
                           </div>
                           {customer.email && (
-                            <div className="flex items-center gap-2 mb-2">
-                              <Mail className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm text-muted-foreground">{customer.email}</span>
+                            <div className="flex items-center gap-2 mb-1 sm:mb-2">
+                              <Mail className="h-3 w-3 sm:h-4 sm:w-4 text-muted-foreground flex-shrink-0" />
+                              <span className="text-xs sm:text-sm text-muted-foreground truncate">{customer.email}</span>
                             </div>
                           )}
-                          <div className="flex flex-wrap items-center gap-2 sm:gap-4 text-xs text-muted-foreground">
-                            <span>Total: {formatAmount(customer.totalPurchases)}</span>
-                            <span>Limite: {formatAmount(customer.creditLimit)}</span>
-                            <span>Dernier paiement: {getDaysSinceLastPayment(customer.lastPayment)}</span>
+                          <div className="flex flex-col sm:flex-row sm:flex-wrap items-start sm:items-center gap-1 sm:gap-4 text-xs text-muted-foreground">
+                            <span className="truncate">Total: {formatAmount(customer.totalPurchases)}</span>
+                            <span className="truncate">Limite: {formatAmount(customer.creditLimit)}</span>
+                            <span className="truncate">Dernier paiement: {getDaysSinceLastPayment(customer.lastPayment)}</span>
                           </div>
                         </div>
 
                         {/* Debt Status and Actions */}
-                        <div className="flex flex-col items-end gap-3">
-                          <div className="text-right">
+                        <div className="flex flex-col items-end gap-2 sm:gap-3 w-full sm:w-auto">
+                          <div className="text-right w-full sm:w-auto">
                             <div 
-                              className={`text-2xl font-bold mb-1 transition-colors duration-300 ${
+                              className={`text-lg sm:text-2xl font-bold mb-1 transition-colors duration-300 ${
                                 customer.amountOwed > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
                               }`}
                             >
@@ -534,7 +930,7 @@ export function CustomerList() {
                             </div>
                           </div>
 
-                          <div className="flex gap-2">
+                          <div className="flex gap-1 sm:gap-2 w-full sm:w-auto justify-end sm:justify-start">
                             {customer.amountOwed > 0 && (
                               <>
                                 <Button
@@ -544,13 +940,13 @@ export function CustomerList() {
                                     handleSendReminder(customer)
                                   }}
                                   disabled={isLoading}
-                                  className="bg-whatsapp hover:bg-whatsapp/90 text-white h-8 px-3 transition-all duration-200 hover:scale-[1.05] disabled:opacity-50"
+                                  className="bg-whatsapp hover:bg-whatsapp/90 text-white h-7 sm:h-8 px-2 sm:px-3 transition-all duration-200 hover:scale-[1.05] disabled:opacity-50 flex-1 sm:flex-none text-xs"
                                   aria-label={`Envoyer un rappel à ${customer.name}`}
                                 >
                                   {isLoading ? (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2 animate-spin" />
                                   ) : (
-                                    <MessageCircle className="h-4 w-4 mr-2" />
+                                    <MessageCircle className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
                                   )}
                                   <span className="hidden sm:inline">Rappel</span>
                                 </Button>
@@ -560,14 +956,72 @@ export function CustomerList() {
                                     e.stopPropagation()
                                     handleOpenPayment(customer)
                                   }}
-                                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-8 px-3 transition-all duration-200 hover:scale-[1.05]"
+                                  className="bg-primary hover:bg-primary/90 text-primary-foreground h-7 sm:h-8 px-2 sm:px-3 transition-all duration-200 hover:scale-[1.05] flex-1 sm:flex-none text-xs"
                                   aria-label={`Enregistrer un paiement pour ${customer.name}`}
                                 >
-                                  <DollarSign className="h-4 w-4 mr-2" />
+                                  <DollarSign className="h-3 w-3 sm:h-4 sm:w-4 sm:mr-2" />
                                   <span className="hidden sm:inline">Payer</span>
                                 </Button>
                               </>
                             )}
+                            
+                            {/* Actions Menu */}
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="h-7 w-7 sm:h-8 sm:w-8 p-0 transition-all duration-200 hover:scale-[1.05] flex-shrink-0"
+                                  aria-label={`Actions pour ${customer.name}`}
+                                >
+                                  <MoreVertical className="h-3 w-3 sm:h-4 sm:w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48">
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleEditCustomer(customer)
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <Edit className="h-4 w-4 mr-2" />
+                                  Modifier
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleOpenPayment(customer)
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <DollarSign className="h-4 w-4 mr-2" />
+                                  Enregistrer paiement
+                                </DropdownMenuItem>
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleSendReminder(customer)
+                                  }}
+                                  className="cursor-pointer"
+                                >
+                                  <MessageCircle className="h-4 w-4 mr-2" />
+                                  Envoyer rappel
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    handleDeleteCustomer(customer)
+                                  }}
+                                  className="cursor-pointer text-destructive focus:text-destructive"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Supprimer
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </div>
                       </div>
@@ -605,6 +1059,61 @@ export function CustomerList() {
           )
         })}
 
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="flex flex-col sm:flex-row items-center justify-between mt-6 p-3 sm:p-4 bg-muted/30 rounded-lg border border-border gap-3 sm:gap-0">
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground text-center sm:text-left">
+              <span className="truncate">
+                Affichage de {startIndex + 1} à {Math.min(endIndex, filteredCustomers.length)} sur {filteredCustomers.length} clients
+              </span>
+            </div>
+            
+            <div className="flex items-center gap-1 sm:gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={prevPage}
+                disabled={currentPage === 1}
+                className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                aria-label="Page précédente"
+              >
+                <ChevronLeft className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+              
+              <div className="flex items-center gap-1">
+                {Array.from({ length: Math.min(3, totalPages) }, (_, i) => {
+                  const pageNum = Math.max(1, Math.min(totalPages - 2, currentPage - 1)) + i
+                  if (pageNum > totalPages) return null
+                  
+                  return (
+                    <Button
+                      key={pageNum}
+                      variant={currentPage === pageNum ? "default" : "outline"}
+                      size="sm"
+                      onClick={() => goToPage(pageNum)}
+                      className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-xs"
+                      aria-label={`Page ${pageNum}`}
+                    >
+                      {pageNum}
+                    </Button>
+                  )
+                })}
+              </div>
+              
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={nextPage}
+                disabled={currentPage === totalPages}
+                className="h-7 w-7 sm:h-8 sm:w-8 p-0"
+                aria-label="Page suivante"
+              >
+                <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Button>
+            </div>
+          </div>
+        )}
+
         {filteredCustomers.length === 0 && (
           <div 
             className="flex flex-col items-center justify-center py-16 text-center opacity-0 animate-[fadeInScale_0.3s_ease-out_forwards]"
@@ -627,14 +1136,15 @@ export function CustomerList() {
             </p>
             {!searchTerm && (
               <div className="opacity-0 animate-[fadeInUp_0.3s_ease-out_0.4s_forwards]">
-                <Button 
+                <AnimatedButton 
                   onClick={() => setIsAddCustomerOpen(true)}
-                  className="bg-primary hover:bg-primary/90 text-primary-foreground transition-all duration-200 hover:scale-[1.05]"
+                  className="bg-primary hover:bg-primary/90 text-primary-foreground"
                   aria-label="Ajouter un nouveau client"
+                  animationType="bounce"
                 >
                   <Plus className="h-4 w-4 mr-2" />
                   Ajouter un client
-                </Button>
+                </AnimatedButton>
               </div>
             )}
           </div>
@@ -756,6 +1266,139 @@ export function CustomerList() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Edit Customer Modal */}
+      <Dialog open={isEditCustomerOpen} onOpenChange={setIsEditCustomerOpen}>
+        <DialogContent className="bg-card border-border max-w-md mx-4 opacity-0 animate-[fadeInScale_0.2s_ease-out_forwards]">
+          <DialogHeader>
+            <DialogTitle className="text-foreground text-xl">Modifier le Client</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-6">
+            <div 
+              className="space-y-2 opacity-0 animate-[fadeInLeft_0.3s_ease-out_0.1s_forwards]"
+            >
+              <Label htmlFor="edit-customer-name" className="text-foreground font-medium">
+                Nom complet *
+              </Label>
+              <Input
+                id="edit-customer-name"
+                placeholder="Ex: Jean Kouassi"
+                value={editCustomer.name}
+                onChange={(e) => setEditCustomer((prev) => ({ ...prev, name: e.target.value }))}
+                className="h-12 text-base bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                aria-required="true"
+                aria-invalid={!editCustomer.name}
+              />
+            </div>
+
+            <div 
+              className="space-y-2 opacity-0 animate-[fadeInLeft_0.3s_ease-out_0.2s_forwards]"
+            >
+              <Label htmlFor="edit-customer-phone" className="text-foreground font-medium">
+                Numéro de téléphone *
+              </Label>
+              <Input
+                id="edit-customer-phone"
+                placeholder="Ex: +225 07 12 34 56 78"
+                value={editCustomer.phone}
+                onChange={(e) => setEditCustomer((prev) => ({ ...prev, phone: e.target.value }))}
+                className="h-12 text-base bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+                aria-required="true"
+                aria-invalid={!editCustomer.phone}
+              />
+            </div>
+
+            <div 
+              className="space-y-2 opacity-0 animate-[fadeInLeft_0.3s_ease-out_0.3s_forwards]"
+            >
+              <Label htmlFor="edit-customer-email" className="text-foreground font-medium">
+                Email (optionnel)
+              </Label>
+              <Input
+                id="edit-customer-email"
+                type="email"
+                placeholder="Ex: jean.kouassi@email.com"
+                value={editCustomer.email}
+                onChange={(e) => setEditCustomer((prev) => ({ ...prev, email: e.target.value }))}
+                className="h-12 text-base bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+              />
+            </div>
+
+            <div 
+              className="space-y-2 opacity-0 animate-[fadeInLeft_0.3s_ease-out_0.4s_forwards]"
+            >
+              <Label htmlFor="edit-customer-credit" className="text-foreground font-medium">
+                Limite de crédit (F CFA)
+              </Label>
+              <Input
+                id="edit-customer-credit"
+                type="number"
+                placeholder="Ex: 50000"
+                value={editCustomer.creditLimit}
+                onChange={(e) => setEditCustomer((prev) => ({ ...prev, creditLimit: e.target.value }))}
+                className="h-12 text-base bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-2 focus:ring-primary/20 transition-all duration-200"
+              />
+            </div>
+
+            <div 
+              className="flex gap-3 opacity-0 animate-[fadeInUp_0.3s_ease-out_0.5s_forwards]"
+            >
+              <Button 
+                variant="outline" 
+                className="flex-1 h-12 bg-transparent transition-all duration-200 hover:scale-[1.05]" 
+                onClick={() => setIsEditCustomerOpen(false)}
+                disabled={isLoading}
+              >
+                Annuler
+              </Button>
+              <Button
+                className="flex-1 h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold transition-all duration-200 hover:scale-[1.05] disabled:opacity-50"
+                onClick={handleUpdateCustomer}
+                disabled={!editCustomer.name || !editCustomer.phone || isLoading}
+              >
+                {isLoading ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Mise à jour...
+                  </>
+                ) : (
+                  "Mettre à jour"
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
+            <AlertDialogDescription>
+              Êtes-vous sûr de vouloir supprimer le client "{customerToDelete?.name}" ? 
+              Cette action est irréversible et supprimera toutes les données associées à ce client.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isLoading}>Annuler</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDeleteCustomer}
+              disabled={isLoading}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Suppression...
+                </>
+              ) : (
+                "Supprimer"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Payment Slideover */}
       <PaymentSlideOver
